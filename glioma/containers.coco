@@ -1,0 +1,511 @@
+#Copyright 2017 Eric T. Anderson
+#Licensed under the Apache License, Version 2.0 (the "License");
+#you may not use this file except in compliance with the License.
+#You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
+#limitations under the license.
+#==============================
+"""
+A suite of collection classes that emulate a small subset of those in the
+Scala standard library.
+"""
+
+import functools, itertools
+import collections.abc as abc
+try:
+    from typing import Any, Dict, Callable, Iterable, Tuple
+    import typing
+except ImportError:
+    Any, Dict, Callable, Iterable, Tuple = ["Any", "Dict", "Callable", "Iterable", "Tuple"]
+
+from .option import Some, Nothing, Maybe
+
+def reify(f:Callable) -> Callable =
+    """
+    A decorator to call the BaseCollection_reify method before invoking the wrapped method.
+    Reification is needed prior to calling methods that work on fully-realized collection elements
+    rather than iterator or generator sources.  Example: BaseCollection.length()
+    """
+    @functools.wraps(f)
+    def wrapped(self, *args, **kwargs) =
+        self._reify()
+        f(self, *args, **kwargs)
+    wrapped
+
+class BaseCollection(abc.Sequence):
+    __slots__ = ['_content', '_source']
+
+    def __init__(self, value:Any) -> None:
+        """
+        Generic initializer for a collection instance.
+        :param value: native (python) collection or None
+        :type value: object
+        :return: None
+        :rtype: None
+        """
+        super(BaseCollection, self).__init__()
+        assert value is not None
+        self._source, self._content = value, None
+
+    def _reify(self) -> None:
+        raise NotImplementedError
+
+    @reify
+    def __call__(self,index:int) -> Any =
+        """Returns the item at the specified index in the collection.
+        :param index: index in collection to fetch from
+        :type index
+        :return: The object at the specified index
+        :rtype: object
+        """
+        if index > (self.length - 1):
+            raise IndexError("index %i out of bounds" % index)
+        self._content[index]
+
+    def __getitem__(self, index) = self.__call__(index)
+
+    def __contains__(self, what:Any) -> bool =
+        """ Support Pythonic 'x in collection' expressions """
+        self.contains(what)
+
+    @reify
+    def __eq__(self,other:Any) = type(self) is type(other) and other._equals(self)
+
+    @reify
+    def __hash__(self) -> int = self._content.__hash__()
+
+    @reify
+    def __iter__(self) -> typing.Iterator =
+        iter(self._content.items() if isinstance(self._content, dict) else 
+            [] if self.isEmpty else self._content
+        )
+
+    def __rshift__(self, f:Callable) -> "BaseCollection" =
+        """ override >> operator, make it a synonym for the map method """
+        self.map(f)
+
+    @reify
+    def _equals(self, other:Any) -> bool = other._content == self._content
+
+    @reify
+    def contains(self, other:Any) -> bool = other in self._content
+
+    @reify
+    def count(self, f:Callable[[Any], bool]) -> int = 
+        def _count(thing:Any):
+            case thing:
+                match [head] + tail:
+                    return (0,1)[f(head)] + _count(tail)
+                match []:
+                    return 0
+            else:
+                raise TypeError()
+        _count(list(self._content))
+
+    def filter(self, f:Callable[[Any], bool]) -> Any =
+        raise NotImplementedError
+        None
+
+    # '>=' alias for map()
+    def __ge__(self, f:Callable[[Any], bool]) -> bool = self.filter(f)
+
+    #def __and__(self, other) = self.filter(other)
+    
+    @reify
+    def find(self, f:Callable[[Any], bool]) -> Maybe = 
+        def _find(thing:Any) -> Maybe:
+            case thing:
+                match [head] + tail:
+                    return Some(head) if f(head) is True else _find(tail)
+                match []:
+                    return Nothing
+            else:
+                raise TypeError()
+
+        _find(list(self._content))
+
+    @reify
+    def fold(self, init:Any, f:Callable[[Any],Any]) -> Any =
+        if self.isEmpty:
+            raise TypeError("fold() called on empty container")
+        self |> reduce$(f, ?, init)
+
+    @reify
+    def forall(self, test:Callable[[Any],bool]) -> bool  = len(list(itertools.takewhile(test, self))) == self.length
+
+    @reify
+    def foreach(self, f:Callable[[Any], bool]) -> None: self._content |> map$(f) |> consume
+
+    @property
+    @reify
+    def isEmpty(self) -> bool = self._content is None or len(self._content) == 0
+
+    @property
+    @reify
+    def length(self) -> int = len(self._content)
+
+    def __len__(self) -> int = self.length
+
+    def map(self,f:Callable[[Any],Any]) -> "BaseCollection":
+        raise NotImplementedError
+
+    def mkString(self, separator:str="") -> str =
+        if self._content is not None:
+            st = separator.join(self._content |> map$(->str(_)))
+        else:
+            st = "source=" + str(self._source)
+        st
+
+    @reify
+    def reduce(self, f:Callable[[Any], Any]) -> Any =
+        if self.isEmpty:
+            raise TypeError("reduce() called on empty container")
+        self._content |> reduce$(f)
+
+    @property
+    def size(self) -> int = self.length
+
+    def takeWhile(self, test:Callable[[Any], bool]) -> "BaseCollection":
+        raise NotImplementedError
+
+    def _zip(self, cls:object, other:Iterable[Any]) -> "BaseCollection"  =
+        cls(source=zip(self, other))
+
+    def _zipWithIndex(self, cls:object) -> "BaseCollection" = 
+        cls(source=zip(
+            self._content.items() if isinstance(self._content, dict) else self._content,
+            range(0, self.length)))
+
+    def _tail(self, cls:object) -> "BaseCollection" =
+        if self.isEmpty:
+            raise IndexError("tail() called on empty collection")
+        cls(source=list(self._content)[1:])
+
+    def _head(self, cls:object) -> Any =
+        if self.isEmpty:
+            raise IndexError("head() called on empty collection")
+        list(self._content)[0]
+
+class List(BaseCollection):
+
+    def __init__(self, *args, **kwargs):
+        super(List, self).__init__(kwargs['source'] if 'source' in kwargs else args)
+        if not 'source' in kwargs: self._reify()
+
+    @reify
+    def __add__(self, other:"List") -> "List" =
+        other._reify() #TODO add external property to get at reified contents of other
+        List(source=self._content + other._content)
+
+    def _reify(self) -> None:
+        if self._content is None:
+            self._content = tuple(self._source)
+            self._source = None
+
+    def __repr__(self) -> str = self.toString
+
+    def filter(self, f:Callable[[Any],bool]) -> "List" =
+        src:Iterable[Any] = self._content if self._content is not None else self._source
+        List(source=src |> filter$(f))
+
+    @property
+    @reify
+    def flatten(self) -> "List" = List(source=itertools.chain.from_iterable(self._content))
+
+    def flatMap(self, f) -> "List" = self.map(f).flatten
+
+    @property
+    @reify
+    def head(self) -> Any = self._head(List)
+
+    @reify
+    def indexOf(self, what:Any, index:int=0) -> int = self.indexWhere(-> _ == what, index)
+
+    @reify
+    def indexWhere(self, test:Callable[[Any], bool], index:int=0) -> int  =
+        rval = -1
+        if index >= 0 and index < (len(self._content) - 1):
+            for (i, x) in enumerate(self._content[index:]):
+                if test(x) is True:
+                    rval = i + index
+                    break
+        rval
+
+    @property
+    @reify
+    def last(self) -> Any =
+        if self.length == 0:
+            raise IndexError("last() called on empty List")
+        self._content[-1]
+
+    @property
+    @reify
+    def list(self) -> typing.List = list(self._content)
+
+    def map(self, f:Callable[[Any],Any]) -> "List" = List(source=(self._content or self._source) |> map$(f))
+
+    @property
+    @reify
+    def reverse(self) -> "List"  = List(source=list(self._content).reverse())
+
+    @property
+    @reify
+    def sorted(self) -> "List"  = List(source=sorted(self._content))
+
+    @reify
+    def sortedWith(self, key) -> "List" = List(source=sorted(self._content, key=key))
+
+    @property
+    @reify
+    def sum(self) -> Any = sum(self._content)
+
+    @property
+    @reify
+    def tail(self) -> Any = self._tail(List)
+
+    @reify
+    def take(self,count:int) -> "List" = (
+        List() if count <= 0 or self.length == 0 else
+        List(source=self._content) if count >= self.length else 
+        List(source=self._content[:count])
+        )
+
+    @reify
+    def takeRight(self, count:int) -> "List" = (
+        List() if count < 1 or self.length == 0 else 
+        List(source=self._content) if count >= self.length else 
+        List(source=self._content[count:])
+        )
+
+    @reify
+    def takeWhile(self, test:Callable[[Any], bool]) -> "List"  =
+        (List() if self.length == 0 else 
+        List(source=itertools.takewhile(test, self._content)))
+
+    @property
+    def toList(self) -> "List" = List(source=self.list)
+
+    @property
+    def toSet(self) -> "Set" = Set(source=(s for s in self.list))
+
+    @property
+    def toString(self) -> str = 'List(%s)' % self.mkString(", ")
+
+    @reify
+    def zip(self,other) -> "List[Tuple[Any]]" = self._zip(List, other)
+
+    @reify
+    def zipWithIndex(self) -> "List[Tuple[int, Any]]" = self._zipWithIndex(List)
+
+class Map(BaseCollection):
+
+    def __init__(self, *args, **kwargs):
+        super(Map, self).__init__(
+            kwargs['source'] if 'source' in kwargs else args
+        )
+        if not 'source' in kwargs:
+            self._reify()
+        else:
+            if isinstance(self._source, (type({}), type([]),)):
+                self._reify()
+
+    def __repr__(self) -> str = self.toString
+
+    @reify
+    def __call__(self, key:Any) -> Any = self._content[key]
+
+    def _reify(self) -> None:
+        if self._content is None:
+            self._content = dict(self._source)
+            self._source = None
+
+    @reify
+    def contains(self, key:Any) -> bool = key in self._content
+
+    @reify
+    def count(self, f:Callable[[Any], bool]) -> int =
+        def ft(acc,(k,v)) = acc + (0,1)[f(k,v)]
+        self._content.items() |> reduce$(ft, ?, 0)
+
+    @reify
+    def filter(self, f:Callable[[Any], bool]) -> "Map" = 
+        Map(source=dict((k,v) for k,v in self._content.items() if f(k,v)))
+
+    @reify
+    def find(self, f:Callable[[Any], bool]) -> Maybe =
+        for k,v, in self._content.items():
+            if f(k,v): return Some((k,v))
+        Nothing
+
+    @reify
+    def forall(self, test:Callable[[Any], bool]) -> bool =
+        def _forall(seq:Iterable) -> bool:
+            case seq:
+                match [head] + tail:
+                    k,v = head
+                    return False if not test(k,v) else _forall(tail)
+                match []:
+                    return True
+        _forall(list(self._content.items()))
+
+    @reify
+    def get(self, key:Any) -> Maybe = 
+        Nothing if not key in self._content else Some(self._content[key])
+
+    @reify
+    def getOrElse(self, key:Any, default:Any) = self._content[key] if key in self._content else default
+
+    @property
+    @reify
+    def head(self) -> Tuple[Any,Any] =
+        if self.length == 0:
+            raise IndexError("head() called on empty Map")
+        h = list(self._content.items())[0]
+        (h[0], h[1])
+
+    @property
+    @reify
+    def tail(self) -> "Map" =
+        if self.isEmpty:
+            raise IndexError("tail() called on empty collection")
+        Map(source=list(self._content.items()[1:]))
+
+    @reify
+    def isDefinedAt(self, key:Any) -> bool = self.contains(key)
+
+    @property
+    @reify
+    def last(self) -> Tuple[Any,Any] =
+        keys = list(self._content.keys())
+        if not keys:
+            raise IndexError("last() called on empty Map")
+        key = keys[-1]
+        (key, self._content[key])
+
+    def map(self, f) -> "Map" =
+        items = self._content.items() if self._content is not None else self._source
+        Map(source=(f(k,v) for (k,v) in items))
+
+    def mkString(self, separator:str="") -> str =
+        separator.join(self._content.items() |> map$(-> _ |>str)) if self._content is not None else str(self._source)
+
+    @reify
+    def takeWhile(self, test:Callable[[Any], bool]) -> "Map" = 
+        def _take(acc:Dict, thing:Iterable):
+            case thing:
+                match [head] + tail:
+                    k,v = head
+                    if test(k,v):
+                        acc[k] = v
+                        return _take(acc, tail)
+                    else:
+                        return acc
+                match []: return acc
+        Map(source=_take({}, list(self._content.items())))
+
+    @property
+    @reify
+    def dict(self) -> Dict = dict(self._content)
+
+    @property
+    @reify
+    def toList(self) -> List = List(source=self._content.items())
+
+    @property
+    @reify
+    def toSet(self) -> "Set" = Set(source=(item for item in self._content.items()))
+
+    @property
+    def toString(self) -> str = 'Map(%s)' % (self.mkString(", "))
+
+    def zip(self, other) -> Tuple[Any, Any] = self._zip(Map, other)
+
+    @property
+    def zipWithIndex(self) -> Tuple[int, Any] = self._zipWithIndex(Map)
+
+class Set(BaseCollection):
+
+    def __init__(self, *args, **kwargs) -> None:
+        super(Set, self).__init__(kwargs['source'] if 'source' in kwargs else args)
+        if not 'source' in kwargs: self._reify()
+        #super(Set, self).__init__(kwargs['source'] if 'source' in kwargs else set(args))
+
+    @reify
+    def __call__(self,value:Any) -> bool = value in self._content
+
+    def __repr__(self) -> str = self.toString
+
+    def _reify(self) -> None:
+        if self._content is None:
+            self._content = frozenset(s for s in self._source)
+            self._source = None
+
+    @property
+    @reify
+    def content(self) -> Iterable = self._content
+
+    def filter(self, f:Callable[[Any], bool]) -> "Set" =
+        src = self._content if self._content is not None else self._source
+        Set(source=src |> filter$(f))
+
+    @property
+    @reify
+    def flatten(self) -> "Set" =
+        Set(source=itertools.chain.from_iterable(self._content))
+
+    @reify
+    def flatMap(self, f:Callable[[Any], Any]) -> "Set" = self.map(f).flatten
+
+    @property
+    @reify
+    def head(self) -> Any = self._head(Set)
+
+    @reify
+    def intersect(self, other:"Set") -> "Set" = Set(source=self._content.intersection(other.content))
+
+    @property
+    @reify
+    def last(self) -> Any =
+        if self.length == 0:
+            raise IndexError("last() called on empty Set")
+        list(self._content)[-1]
+
+    def map(self, f:Callable[[Any],Any]) -> "Set" = Set(source=(self._content or self._source) |> map$(f))
+
+    @property
+    @reify
+    def set(self) -> set = set(self._content)
+
+    @property
+    @reify
+    def sum(self) -> Any = sum(self._content)
+
+    @property
+    @reify
+    def tail(self) -> "Set" = self._tail(Set)
+
+    @reify
+    def takeWhile(self, test:Callable[[Any],Any]) -> "Set" = Set(source=self._content |> takewhile$(test))
+
+    @property
+    @reify
+    def toList(self) -> List = List(source=self._content)
+
+    @property
+    def toString(self) -> str = 'Set(%s)' % self.mkString(", ")
+
+    @reify
+    def union(self, other) -> "Set" = Set(source=self._content.union(other.set))
+
+    @reify
+    def zip(self, other) -> "Set[Tuple[Any,Any]]" = self._zip(Set, other)
+
+    @property
+    @reify
+    def zipWithIndex(self) -> "Set[Tuple[int, Any]]" = self._zipWithIndex(Set)

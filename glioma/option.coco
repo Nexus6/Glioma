@@ -1,0 +1,159 @@
+#Copyright 2017 Eric T. Anderson
+#Licensed under the Apache License, Version 2.0 (the "License");
+#you may not use this file except in compliance with the License.
+#You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
+#limitations under the license.
+#==============================
+"""
+A suite of collection classes that emulate a small subset of those in the
+Scala standard library.
+"""
+import sys
+
+try:
+    from typing import Callable, Iterable, Any, Union, Optional
+    import typing
+except ImportError:
+    Callable, Any, Iterable, Union, Optional = ["Callable", "Any", "Iterable", "Union", "Optional"]
+
+class Maybe(object):
+    """ Analogous to the Scala Option class """
+    __slots__ = ['_content']
+
+    def __init__(self, value) -> None:
+        self._content = value
+
+    def __iter__(self) -> Iterable = iter([self._content])
+
+    def __eq__(self, other:Any) -> bool =
+        (self.__class__ == other.__class__) and self._content == other._content
+
+    def __ne__(self, other:Any) -> bool = not self.__eq__(other)
+
+    def __repr__(self) -> str = self.toString
+
+    def forall(self, test:Callable[[Any], bool]) -> bool =
+        self.takeWhile(test).length == self.length
+
+    def foreach(self, f:Callable[[Any], bool]) -> bool = f(self._content)
+
+    @property
+    def get(self) -> Any = self._content
+
+    def getOrElse(self, f:Union[Callable[[],Any], Any]) -> Any = self._content or (f() if callable(f) else f)
+
+    def getOrNone(self) -> Optional[Any] = self._content
+
+    @property
+    def isEmpty(self) -> bool = self._content is None
+
+    def map(self, f:Callable[[Any], Any]) -> "Maybe" = Option(f(self._content))
+
+    def __rshift__(self, f:Callable[[Any],Any]) -> "Maybe" = self.map(f)
+
+    def orElse(self, f:Union[Callable[[], Any], Any]) -> Any =
+        rval = self if self._content is not None else f() if callable(f) else f
+        if not isinstance(rval, Maybe):
+            raise TypeError("orElse() must return a Maybe")
+        rval
+
+    @property
+    def orNone(self) -> Optional["Maybe"] = self
+
+    @property
+    def toList(self) -> "List" = 
+        from .containers import List as GList
+        GList(source=[self._content])
+
+class Some(Maybe):
+
+    def __init__(self, value) -> None:
+        super(Some, self).__init__(value)
+
+    def filter(self, f:Callable[[Any], bool]) -> Maybe = self if f(self._content) else Nothing
+
+    def mkString(self, sep=None) -> str = str(self._content)
+
+    def takeWhile(self, test:Callable[[Any], bool]) -> "List" =
+        from .containers import List as GList
+        GList(self._content) if test(self._content) else GList()
+
+    @property
+    def toString(self) -> str = 'Some(%s)' % str(self._content)
+
+class NoInstantiate(object):
+    def __init__(self) -> None :
+        super(NoInstantiate, self).__init__()
+    def __new__(cls, *args, **kwargs) -> None:
+        raise Exception("Cannot instantiate Nothing")
+
+class NothingType(type, object):
+
+    @property
+    def get(self) -> None:
+        raise TypeError("nothing comes of Nothing")
+
+    @property
+    def isEmpty(self) -> bool = True
+
+    @property
+    def orNone(self) -> Optional[Any] = None
+
+    @property
+    def toList(self) -> "List" = 
+        from .containers import List as GList
+        GList()
+
+    @property
+    def toString(self) -> str = "Nothing"
+
+    def __repr__(self) -> str = self.toString
+    def __iter__(self) -> Iterable = [].__iter__()
+    def __len__(self)  -> int = 0
+    def __rshift__(self, f:Callable[[Any], Any]) -> Maybe = self.map(f)
+
+    @staticmethod
+    def orElse(f:Union[Callable[[], Any], Any]) -> Any =
+        rval = f() if callable(f) else f
+        if not isinstance(rval, Maybe):
+            raise TypeError("orElse() function must return an Option")
+        rval
+
+    @staticmethod
+    def getOrNone() -> Optional[Any] = None
+
+    @staticmethod
+    def getOrElse(f:Union[Callable[[], Any], Any]) = f() if callable(f) else f
+
+    @staticmethod
+    def filter(f) -> Maybe = Nothing
+
+    @staticmethod
+    def foreach(f) -> None:
+        pass
+
+    @staticmethod
+    def map(f) -> Maybe  = Nothing
+
+    @staticmethod
+    def mkString(sep=None) -> str = ""
+
+    @staticmethod
+    def takeWhile(test:Callable[[Any], bool]) -> "List" =
+        from .containers import List as GList
+        GList()
+
+if sys.version[0] == '2':
+    Nothing = NothingType('Nothing'.encode('utf-8'), (NoInstantiate,), {})
+else:
+    Nothing = NothingType('Nothing', (NoInstantiate,), {})
+
+
+def Option(value:Optional[Any]) = Some(value) if value is not None else Nothing

@@ -1,0 +1,10 @@
+include
+lib
+bin
+build
+share
+pip-selfcheck.json
+glioma/*.py
+.tox
+__pycache__
+*.pyc
