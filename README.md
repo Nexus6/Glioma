@@ -4,9 +4,9 @@ Glioma: Collections classes for Python, inspired by the Scala Standard Library.
 * All collections classes are immutable.
 * Collections can be initialized with generators for lazy evaluation.
 * This library has no external dependencies other than the py.test package for testing.
-* Python 2.7.
-* To run tests, execute "py.test ./tests.py"
-* License: GNU General Public License, version 3.
+* Python 3.5 (unofficial support for 2.7 and PyPy)
+* To run tests, execute "py.test ./tests.py" or "make test-all"
+* License: Apache 2.03
 
 Examples:
 * The List class, basic usage
