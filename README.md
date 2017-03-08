@@ -8,6 +8,9 @@ Glioma: Collections classes for Python, inspired by the Scala Standard Library.
 * To run tests, execute "py.test ./tests.py" or "make test-all"
 * License: Apache 2.03
 
+Installation:
+* pip install glioma
+
 Examples:
 * The List class, basic usage
 
