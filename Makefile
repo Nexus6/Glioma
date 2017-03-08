@@ -36,7 +36,7 @@ help:
 	@echo "sync        		sync requirements with pip"
 
 .coco.py: 
-	coconut -j2 -t35 $<
+	coconut -j2 $<
 
 clean: clean-build clean-pyc clean-test
 
@@ -112,7 +112,6 @@ release: clean docs compile
 dist: clean compile
 	#python setup.py sdist
 	python setup.py bdist_wheel
-	ls -l dist
 
 install: clean
 	python setup.py install
