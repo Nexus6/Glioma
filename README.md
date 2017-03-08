@@ -46,8 +46,8 @@ Examples:
     List(1,2,3).takeWhile(lambda _: _ < 3) == List(1,2)
     List(1,2,3,4).takeRight(0) == List()
     List(1,2,3,4).takeRight(2) == List(3,4)
-    List(1, 2, 3).forall(lambda _ : _ < 4) is True
-    List(1, 2, 3).forall(lambda _ : _ < 2) is False
+    List(1,2,3).forall(lambda _ : _ < 4) is True
+    List(1,2,3).forall(lambda _ : _ < 2) is False
     List(3,4,5).find(lambda _:_==4) == Some(4)
     List(3,4,5).find(lambda _:_==10) is Nothing
 ```
@@ -69,7 +69,8 @@ Contribution guidelines:
 
 * Please write tests for all new functionality and modifications to existing functionality.
 * Please do not make bulk formatting changes.  Instead follow the general formatting approach in use currently. Adoption of the PEP8 orthodoxy will happen eventually.
-* Please stick to the Scala-esque naming conventions rather than Python ones.  For example, Set().toList rather than Set().to_list().
+* Use type annotations (mypy) liberally.
+* Please stick to Scala-esque naming conventions rather than Python ones.  For example, Set().toList rather than Set().to_list().
 * Represent methods as properties as appropriate to match the Scala containers.  For example, List.length not List.length().
 * The greatest needs right now, apart from new development and documentation, are 1) code-reviews to ensure that class member functions are in fact "work-alikes" for the corresponding Scala library classes, 2) that Python standard libraries and idioms are being used correctly and efficiently, and 3) that the library classes are feature-complete.  More type-checking of input parameters would be nice to have.  Python performance gurus are especially needed as few optimizations have been attempted in the code.
 
