@@ -19,7 +19,7 @@ setup(
     url='https://github.com/Nexus6/Glioma',
 
     author='Eric T. Anderson',
-    author_email='ultracode@gmail.com',
+    author_email='',
 
     license='Apache Software License',
     
