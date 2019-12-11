@@ -16,17 +16,13 @@ setup(
     description="A small library of immutable collections classes, inspired by those in the Scala standard library.",
     long_description='',
 
-    # The project's main homepage.
     url='https://github.com/Nexus6/Glioma',
 
-    # Author details
     author='Eric T. Anderson',
     author_email='ultracode@gmail.com',
 
-    # Choose your license
-    license='Apache 2.0',
-
-    # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
+    license='Apache Software License',
+    
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
@@ -49,11 +45,7 @@ setup(
         "Programming Language :: Python :: Implementation :: PyPy",
     ],
 
-    # What does your project relate to?
     keywords='Scala functional immutable collections',
-
-    # You can just specify the packages manually here if your project is
-    # simple. Or you can use find_packages().
     packages=["glioma"],
 
     # List additional groups of dependencies here (e.g. development
