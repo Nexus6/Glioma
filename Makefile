@@ -36,7 +36,7 @@ help:
 	@echo "sync        		sync requirements with pip"
 
 .coco.py: 
-	coconut -j2 -t35 $<
+	coconut -jsys -t38 $<
 
 clean: clean-build clean-pyc clean-test
 
@@ -44,6 +44,7 @@ clean-build:
 	rm -f glioma/option.py
 	rm -f glioma/containers.py
 	rm -f glioma/either.py
+	rm -f glioma/__init__.py
 	rm -fr $(DOCSBUILDDIR)/
 	rm -fr dist/
 	rm -fr .eggs/
@@ -59,16 +60,15 @@ clean-pyc:
 clean-test:
 	rm -fr .tox/
 	rm -f .coverage
-	rm -fr .htmlcov/
+	rm -fr ./htmlcov/
 
 clean-docs:
 	rm -f $(DOCSSOURCEDIR)/json_config.rst
 	rm -f $(DOCSSOURCEDIR)/modules.rst
-	$(MAKE) -C docs clean
+	#$(MAKE) -C docs clean
 
 test: compile
-	tox
-	#pytest ./tests.py
+	tox -e py38
 
 test-all: compile
 	tox
@@ -76,18 +76,17 @@ test-all: compile
 coverage:
 	coverage run setup.py test
 	coverage report
-	coverage html
-	$(BROWSER) .htmlcov/index.html
-	$(MAKE) -C docs coverage
+	coverage html -d ./htmlcov --include=glioma/* --omit=glioma/__*
+	$(BROWSER) ./htmlcov/index.html
 
 github:
-	python docs/github_docs.py
-	rst-lint README.rst
+	#python docs/github_docs.py
+	#rst-lint README.rst
 
 docs: clean-docs builddocs github
 
 builddocs:
-	# add --no-headings if your adding them manually
+	# add --no-headings if you're adding them manually
 	sphinx-apidoc \
 		--private \
 		--no-toc \
@@ -110,9 +109,7 @@ release: clean docs compile
 
 #dist: clean docs compile
 dist: clean compile
-	#python setup.py sdist
 	python setup.py bdist_wheel
-	ls -l dist
 
 install: clean
 	python setup.py install
@@ -124,7 +121,7 @@ register:
 	python setup.py register
 
 compile: 
-	coconut -j2 .
+	coconut -jsys .
 
 requirements:
 	pip install --quiet --upgrade setuptools pip wheel pip-tools
