@@ -1,4 +1,4 @@
-Glioma: Collections classes for Python, inspired by the Scala Standard Library.
+Glioma: Collections classes for Python, inspired by the Scala 2 Standard Library.
 
 * Implements a subset of the Map, List, Set, Option, and Either classes from the Scala Standard Library
 * All collections classes are immutable.
