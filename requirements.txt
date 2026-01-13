@@ -20,6 +20,6 @@ requests-toolbelt==0.7.0
 six==1.10.0
 tox==2.5.0
 twine==1.8.1
-virtualenv==20.26.6
+virtualenv==20.36.1
 watchdog==0.8.3
 wcwidth==0.1.7
